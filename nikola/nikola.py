@@ -71,7 +71,9 @@ DEFAULT_TRANSLATIONS_PATTERN = '{path}.{lang}.{ext}'
 from .post import Post
 from . import utils
 from .plugin_categories import (
+    BaseTask,
     Command,
+    EarlyTask,
     LateTask,
     PageCompiler,
     RestExtension,
@@ -614,8 +616,7 @@ class Nikola(object):
 
         self.plugin_manager = PluginManager(categories_filter={
             "Command": Command,
-            "Task": Task,
-            "LateTask": LateTask,
+            "BaseTask": BaseTask,
             "TemplateSystem": TemplateSystem,
             "PageCompiler": PageCompiler,
             "TaskMultiplier": TaskMultiplier,
@@ -654,8 +655,17 @@ class Nikola(object):
             plugin_info.plugin_object.short_help = plugin_info.description
             self._commands[plugin_info.name] = plugin_info.plugin_object
 
-        self._activate_plugins_of_category("Task")
-        self._activate_plugins_of_category("LateTask")
+        task_plugins = self._activate_plugins_of_category("BaseTask")
+        self.task_stages = defaultdict(list)
+        for plugin_info in task_plugins:
+            if type(plugin_info.plugin_object) == EarlyTask:
+                continue
+            if type(plugin_info.plugin_object) == Task:
+                continue
+            if type(plugin_info.plugin_object) == LateTask:
+                continue
+            stage = plugin_info.plugin_object.get_stage()
+            self.task_stages[stage].append(plugin_info.plugin_object)
         self._activate_plugins_of_category("TaskMultiplier")
 
         compilers = defaultdict(set)
@@ -1239,7 +1249,10 @@ class Nikola(object):
             task['targets'] = [os.path.normpath(t) for t in targets]
         return task
 
-    def gen_tasks(self, name, plugin_category, doc=''):
+    def get_task_stages(self):
+        return sorted(list(self.task_stages.keys()))
+
+    def gen_tasks(self, name, stage, doc=''):
 
         def flatten(task):
             if isinstance(task, dict):
@@ -1250,8 +1263,8 @@ class Nikola(object):
                         yield ft
 
         task_dep = []
-        for pluginInfo in self.plugin_manager.getPluginsOfCategory(plugin_category):
-            for task in flatten(pluginInfo.plugin_object.gen_tasks()):
+        for plugin_object in self.task_stages[stage]:
+            for task in flatten(plugin_object.gen_tasks()):
                 assert 'basename' in task
                 task = self.clean_task_paths(task)
                 yield task
@@ -1262,8 +1275,8 @@ class Nikola(object):
                         yield self.clean_task_paths(task)
                     if flag:
                         task_dep.append('{0}_{1}'.format(name, multi.plugin_object.name))
-            if pluginInfo.plugin_object.is_default:
-                task_dep.append(pluginInfo.plugin_object.name)
+            if plugin_object.is_default:
+                task_dep.append(plugin_object.name)
         yield {
             'basename': name,
             'doc': doc,
