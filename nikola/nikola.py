@@ -658,6 +658,11 @@ class Nikola(object):
         task_plugins = self._activate_plugins_of_category("BaseTask")
         self.task_stages = defaultdict(list)
         for plugin_info in task_plugins:
+            # While yapsy searches for plugins, it will also find
+            # the classes EarlyTask, Task and LateTask (from Nikola)
+            # and assume they are plugins (since they are derived from
+            # BaseTask as well). Since they lead to exceptions, we
+            # have to sort them out manually.
             if type(plugin_info.plugin_object) == EarlyTask:
                 continue
             if type(plugin_info.plugin_object) == Task:
