@@ -30,7 +30,7 @@ from nikola.plugin_categories import BaseTask
 
 
 class ScanPosts(BaseTask):
-    """Just load tasks."""
+    """Just scans for posts."""
 
     name = "scan_posts"
 
