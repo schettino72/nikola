@@ -669,7 +669,7 @@ class Nikola(object):
                 continue
             if type(plugin_info.plugin_object) == LateTask:
                 continue
-            stage = plugin_info.plugin_object.get_stage()
+            stage = plugin_info.plugin_object.stage
             self.task_stages[stage].append(plugin_info.plugin_object)
         self._activate_plugins_of_category("TaskMultiplier")
 

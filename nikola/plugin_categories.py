@@ -141,9 +141,8 @@ class BaseTask(BasePlugin):
     # the others have to be specifie in the command line.
     is_default = True
 
-    def get_stage(self):
-        """At which level to run."""
-        raise NotImplementedError()
+    # at which stage to run
+    stage = 10
 
     def gen_tasks(self):
         """Task generator."""
@@ -163,8 +162,7 @@ class EarlyTask(BaseTask):
 
     name = "dummy_task"
 
-    def get_stage(self):
-        return -10
+    stage = -10
 
 
 class Task(BaseTask):
@@ -172,8 +170,7 @@ class Task(BaseTask):
 
     name = "dummy_task"
 
-    def get_stage(self):
-        return 10
+    stage = 10
 
 
 class LateTask(BaseTask):
@@ -181,8 +178,7 @@ class LateTask(BaseTask):
 
     name = "dummy_latetask"
 
-    def get_stage(self):
-        return 100
+    stage = 100
 
 
 class TemplateSystem(BasePlugin):
