@@ -1257,7 +1257,10 @@ class Nikola(object):
     def get_task_stages(self):
         return sorted(list(self.task_stages.keys()))
 
-    def gen_tasks(self, name, stage, doc=''):
+    def get_stage_plugin_objects(self, stage):
+        return self.task_stages[stage]
+
+    def gen_task(self, name, plugin_object):
 
         def flatten(task):
             if isinstance(task, dict):
@@ -1268,20 +1271,29 @@ class Nikola(object):
                         yield ft
 
         task_dep = []
-        for plugin_object in self.task_stages[stage]:
-            for task in flatten(plugin_object.gen_tasks()):
-                assert 'basename' in task
-                task = self.clean_task_paths(task)
+        tasks = []
+        for task in flatten(plugin_object.gen_tasks()):
+            assert 'basename' in task
+            task = self.clean_task_paths(task)
+            tasks.append(task)
+            for multi in self.plugin_manager.getPluginsOfCategory("TaskMultiplier"):
+                flag = False
+                for task in multi.plugin_object.process(task, name):
+                    flag = True
+                    tasks.append(self.clean_task_paths(task))
+                if flag:
+                    task_dep.append('{0}_{1}'.format(name, multi.plugin_object.name))
+        if plugin_object.is_default:
+            task_dep.append(plugin_object.name)
+        return tasks, task_dep
+
+    def gen_tasks(self, name, stage, doc=''):
+        task_dep = []
+        for plugin_object in self.get_stage_plugin_objects(stage):
+            tasks, task_dep_ = self.gen_task(name, plugin_object)
+            task_dep.extend(task_dep_)
+            for task in tasks:
                 yield task
-                for multi in self.plugin_manager.getPluginsOfCategory("TaskMultiplier"):
-                    flag = False
-                    for task in multi.plugin_object.process(task, name):
-                        flag = True
-                        yield self.clean_task_paths(task)
-                    if flag:
-                        task_dep.append('{0}_{1}'.format(name, multi.plugin_object.name))
-            if plugin_object.is_default:
-                task_dep.append(plugin_object.name)
         yield {
             'basename': name,
             'doc': doc,
