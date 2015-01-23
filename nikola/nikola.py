@@ -1287,21 +1287,6 @@ class Nikola(object):
             task_dep.append(plugin_object.name)
         return tasks, task_dep
 
-    def gen_tasks(self, name, stage, doc=''):
-        task_dep = []
-        for plugin_object in self.get_stage_plugin_objects(stage):
-            tasks, task_dep_ = self.gen_task(name, plugin_object)
-            task_dep.extend(task_dep_)
-            for task in tasks:
-                yield task
-        yield {
-            'basename': name,
-            'doc': doc,
-            'actions': None,
-            'clean': True,
-            'task_dep': task_dep
-        }
-
     def scan_posts(self, really=False, ignore_quit=False, quiet=False):
         """Scan all the posts."""
         if self._scanned and not really:

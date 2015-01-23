@@ -261,10 +261,25 @@ class NikolaTaskLoader(TaskLoader):
             doc = 'Stage {0} tasks'.format(stage)
         return name, doc, mid_name
 
+    def _generate_stage_tasks(self, name, stage, doc):
+        task_dep = []
+        for plugin_object in self.site.get_stage_plugin_objects(stage):
+            tasks, task_dep_ = self.site.gen_task(name, plugin_object)
+            task_dep.extend(task_dep_)
+            for task in tasks:
+                yield task
+        yield {
+            'basename': name,
+            'doc': doc,
+            'actions': None,
+            'clean': True,
+            'task_dep': task_dep
+        }
+
     def _generate_stage(self, stages):
         stage = stages[0]
         done_name, doc, mid_name = self._get_stage_info(stage)
-        yield self.nikola.gen_tasks(mid_name, stage, doc)
+        yield self._generate_stage_tasks(mid_name, stage, doc)
         done_deps = [mid_name]
         if len(stages) > 1:
             gen_name, _, _ = self._get_stage_info(stages[1])
@@ -296,7 +311,7 @@ class NikolaTaskLoader(TaskLoader):
                 DOIT_CONFIG['default_tasks'].append(name)
                 tasks.extend(generate_tasks(
                     name,
-                    self.nikola.gen_tasks(name, stage, doc)))
+                    self._generate_stage_tasks(name, stage, doc)))
         signal('initialized').send(self.nikola)
         return tasks, DOIT_CONFIG
 
