@@ -263,8 +263,8 @@ class NikolaTaskLoader(TaskLoader):
 
     def _generate_stage_tasks(self, name, stage, doc):
         task_dep = []
-        for plugin_object in self.site.get_stage_plugin_objects(stage):
-            tasks, task_dep_ = self.site.gen_task(name, plugin_object)
+        for plugin_object in self.nikola.get_stage_plugin_objects(stage):
+            tasks, task_dep_ = self.nikola.gen_task(name, plugin_object)
             task_dep.extend(task_dep_)
             for task in tasks:
                 yield task
