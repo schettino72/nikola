@@ -617,6 +617,9 @@ class Nikola(object):
         self.plugin_manager = PluginManager(categories_filter={
             "Command": Command,
             "BaseTask": BaseTask,
+            "EarlyTask": EarlyTask,  # sub-category of BaseTask
+            "LateTask": LateTask,  # sub-category of BaseTask
+            "Task": Task,  # sub-category of BaseTask
             "TemplateSystem": TemplateSystem,
             "PageCompiler": PageCompiler,
             "TaskMultiplier": TaskMultiplier,
@@ -658,17 +661,10 @@ class Nikola(object):
         task_plugins = self._activate_plugins_of_category("BaseTask")
         self.task_stages = defaultdict(list)
         for plugin_info in task_plugins:
-            # While yapsy searches for plugins, it will also find
-            # the classes EarlyTask, Task and LateTask (from Nikola)
-            # and assume they are plugins (since they are derived from
-            # BaseTask as well). Since they lead to exceptions, we
-            # have to sort them out manually.
-            if type(plugin_info.plugin_object) == EarlyTask:
-                continue
-            if type(plugin_info.plugin_object) == Task:
-                continue
-            if type(plugin_info.plugin_object) == LateTask:
-                continue
+            # Note that the serach for BaseTask plugins also finds Task plugins,
+            # LateTask plugins, and EarlyTask plugins. Since we gave them own
+            # categories, the definitions of Task, LateTask and EarlyTask
+            # themselves won't be incorrectly detected as plugins.
             stage = plugin_info.plugin_object.stage
             self.task_stages[stage].append(plugin_info.plugin_object)
         self._activate_plugins_of_category("TaskMultiplier")
