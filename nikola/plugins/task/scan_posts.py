@@ -34,8 +34,7 @@ class ScanPosts(BaseTask):
 
     name = "scan_posts"
 
-    def get_stage(self):
-        return 0
+    stage = 0
 
     def gen_tasks(self):
         """Scan for posts."""
