@@ -240,52 +240,79 @@ class NikolaTaskLoader(TaskLoader):
 
     def _get_stage_info(self, stage):
         if stage == -10:
-            name = 'pre_scanning'
-            mid_name = 'pre_scanning_wait'
+            post_name = 'pre_scanning'
+            pre_name = 'pre_scanning_pre'
             doc = 'Group of tasks to be run before scanning for posts'
         elif stage == 0:
-            name = 'scanning'
-            mid_name = 'scanning_wait'
+            post_name = 'scanning'
+            pre_name = 'scanning_pre'
             doc = 'Task scanning for posts'
         elif stage == 10:
-            name = 'render_site'
-            mid_name = 'render_site_wait'
+            post_name = 'render_site'
+            pre_name = 'render_site_pre'
             doc = 'Group of tasks to render the site.'
         elif stage == 100:
-            name = 'post_render'
-            mid_name = 'post_render_wait'
+            post_name = 'post_render'
+            pre_name = 'post_render_pre'
             doc = 'Group of tasks to be executed after site is rendered.'
         else:
-            name = 'stage_{0}_done'.format(stage)
-            mid_name = 'stage_{0}_wait'.format(stage)
+            post_name = 'stage_{0}_done'.format(stage)
+            pre_name = 'stage_{0}_pre'.format(stage)
             doc = 'Stage {0} tasks'.format(stage)
-        return name, doc, mid_name
+        return pre_name, post_name, doc
 
-    def _generate_stage_tasks(self, name, stage, doc):
+    def _generate_plugin_task(self, plugin_object, post_name, wait_name):
+        tasks, task_dep_ = self.nikola.gen_task(post_name, plugin_object)
+        for task in tasks:
+            yield task
+        task = {
+            'basename': wait_name,
+            'name': None,
+            'doc': "Waiting for {0}'s tasks".format(plugin_object.name),
+            'clean': True,
+            'task_dep': task_dep_
+        }
+        yield task
+
+    def _generate_plugin_wait_task(self, plugin_object, pre_name, post_name):
+        wait_name = plugin_object.name + "_wait"
+        return wait_name, Task(wait_name, None, loader=DelayedLoader(lambda: self._generate_plugin_task(plugin_object, post_name, wait_name), executed=pre_name))
+
+    def _generate_stage_tasks(self, stage, previous_stage=None, make_delayed=False):
+        pre_name, post_name, doc = self._get_stage_info(stage)
+        pre_task = {
+            'basename': pre_name,
+            'name': None,
+            'doc': None,
+            'clean': True,
+        }
+        if previous_stage is not None:
+            _, last_post_name, _ = self._get_stage_info(previous_stage)
+            pre_task['task_dep'] = [last_post_name]
+        yield pre_task
+
         task_dep = []
         for plugin_object in self.nikola.get_stage_plugin_objects(stage):
-            tasks, task_dep_ = self.nikola.gen_task(name, plugin_object)
-            task_dep.extend(task_dep_)
-            for task in tasks:
+            if make_delayed:
+                wait_name, task = self._generate_plugin_wait_task(plugin_object, pre_name, post_name)
                 yield task
+                task_dep.append(wait_name)
+            else:
+                tasks, task_dep_ = self.nikola.gen_task(post_name, plugin_object)
+                task_dep.extend(task_dep_)
+                for task in tasks:
+                    if 'task_dep' not in task:
+                        task['task_dep'] = []
+                    task['task_dep'].append(pre_name)
+                    yield task
+
         yield {
-            'basename': name,
+            'basename': post_name,
+            'name': None,
             'doc': doc,
-            'actions': None,
             'clean': True,
             'task_dep': task_dep
         }
-
-    def _generate_stage(self, stages):
-        stage = stages[0]
-        done_name, doc, mid_name = self._get_stage_info(stage)
-        yield self._generate_stage_tasks(mid_name, stage, doc)
-        done_deps = [mid_name]
-        if len(stages) > 1:
-            gen_name, _, _ = self._get_stage_info(stages[1])
-            done_deps.append(gen_name)
-            yield Task(gen_name, None, loader=DelayedLoader(lambda: self._generate_stage(stages[1:]), executed=mid_name))
-        yield {'basename': done_name, 'doc': None, 'name': None, 'task_dep': done_deps}
 
     def load_tasks(self, cmd, opt_values, pos_args):
         if self.quiet:
@@ -299,19 +326,16 @@ class NikolaTaskLoader(TaskLoader):
                 'outfile': sys.stderr,
             }
         stages = self.nikola.get_task_stages()
-        if cmd.execute_tasks:
-            name, _, _ = self._get_stage_info(stages[0])
-            DOIT_CONFIG['default_tasks'] = [name]
-            tasks = generate_tasks(name, self._generate_stage(stages))
-        else:
-            DOIT_CONFIG['default_tasks'] = []
-            tasks = []
-            for stage in stages:
-                name, doc, _ = self._get_stage_info(stage)
-                DOIT_CONFIG['default_tasks'].append(name)
-                tasks.extend(generate_tasks(
-                    name,
-                    self._generate_stage_tasks(name, stage, doc)))
+        DOIT_CONFIG['default_tasks'] = []
+        tasks = []
+        previous_stage = None
+        for stage in stages:
+            name, doc, _ = self._get_stage_info(stage)
+            DOIT_CONFIG['default_tasks'].append(name)
+            tasks.extend(generate_tasks(
+                name,
+                self._generate_stage_tasks(stage, previous_stage, cmd.execute_tasks and previous_stage is not None)))
+            previous_stage = stage
         signal('initialized').send(self.nikola)
         return tasks, DOIT_CONFIG
 
