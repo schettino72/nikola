@@ -317,6 +317,7 @@ class NikolaTaskLoader(TaskLoader):
         }
 
     def load_tasks(self, cmd, opt_values, pos_args):
+        task_dep_on_phases = len(pos_args)==0
         if self.quiet:
             DOIT_CONFIG = {
                 'verbosity': 0,
@@ -337,7 +338,8 @@ class NikolaTaskLoader(TaskLoader):
             tasks.extend(generate_tasks(
                 name,
                 self._generate_stage_tasks(stage, previous_stage, cmd.execute_tasks and previous_stage is not None)))
-            previous_stage = stage
+            if task_dep_on_phases:
+                previous_stage = stage
         signal('initialized').send(self.nikola)
         return tasks, DOIT_CONFIG
 
