@@ -261,29 +261,32 @@ class NikolaTaskLoader(TaskLoader):
             doc = 'Stage {0} tasks'.format(stage)
         return pre_name, post_name, doc
 
-    def _generate_plugin_task(self, plugin_object, post_name, wait_name):
+    def _add_task_dep(self, task, dep):
+        if 'task_dep' not in task:
+            task['task_dep'] = []
+        task['task_dep'].append(dep)
+
+    def _generate_plugin_task(self, plugin_object, post_name):
         tasks, task_dep_ = self.nikola.gen_task(post_name, plugin_object)
         for task in tasks:
             yield task
-        task = {
-            'basename': wait_name,
-            'name': None,
-            'doc': "Waiting for {0}'s tasks".format(plugin_object.name),
-            'clean': True,
-            'task_dep': task_dep_
+        yield {
+            'basename': plugin_object.name,
+            'name': 'base_task[{0}]'.format(plugin_object.name),
+            'doc': 'Base task for {0}'.format(plugin_object.name),
+            'task_dep': task_dep_,
+            'actions': None,
         }
-        yield task
 
-    def _generate_plugin_wait_task(self, plugin_object, pre_name, post_name):
-        wait_name = plugin_object.name + "_wait"
-        return wait_name, Task(wait_name, None, loader=DelayedLoader(lambda: self._generate_plugin_task(plugin_object, post_name, wait_name), executed=pre_name))
+    def _generate_plugin_generator_task(self, plugin_object, pre_name, post_name):
+        return Task(plugin_object.name, None, loader=DelayedLoader(lambda: self._generate_plugin_task(plugin_object, post_name), executed=pre_name))
 
     def _generate_stage_tasks(self, stage, previous_stage=None, make_delayed=False):
         pre_name, post_name, doc = self._get_stage_info(stage)
         pre_task = {
             'basename': pre_name,
             'name': None,
-            'doc': None,
+            'doc': 'Initial waiting task for tasks in group "{0}"'.format(post_name),
             'clean': True,
         }
         if previous_stage is not None:
@@ -293,18 +296,17 @@ class NikolaTaskLoader(TaskLoader):
 
         task_dep = []
         for plugin_object in self.nikola.get_stage_plugin_objects(stage):
+            this_task_deps = [plugin_object.name]
             if make_delayed:
-                wait_name, task = self._generate_plugin_wait_task(plugin_object, pre_name, post_name)
-                yield task
-                task_dep.append(wait_name)
+                yield self._generate_plugin_generator_task(plugin_object, pre_name, post_name)
             else:
                 tasks, task_dep_ = self.nikola.gen_task(post_name, plugin_object)
-                task_dep.extend(task_dep_)
+                this_task_deps += task_dep_
                 for task in tasks:
-                    if 'task_dep' not in task:
-                        task['task_dep'] = []
-                    task['task_dep'].append(pre_name)
+                    self._add_task_dep(task, pre_name)
                     yield task
+            if plugin_object.is_default:
+                task_dep.extend(this_task_deps)
 
         yield {
             'basename': post_name,

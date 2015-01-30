@@ -1279,8 +1279,6 @@ class Nikola(object):
                     tasks.append(self.clean_task_paths(task))
                 if flag:
                     task_dep.append('{0}_{1}'.format(name, multi.plugin_object.name))
-        if plugin_object.is_default:
-            task_dep.append(plugin_object.name)
         return tasks, task_dep
 
     def scan_posts(self, really=False, ignore_quit=False, quiet=False):
