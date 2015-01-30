@@ -330,7 +330,7 @@ class NikolaTaskLoader(TaskLoader):
         tasks = []
         previous_stage = None
         for stage in stages:
-            name, doc, _ = self._get_stage_info(stage)
+            _, name, _ = self._get_stage_info(stage)
             DOIT_CONFIG['default_tasks'].append(name)
             tasks.extend(generate_tasks(
                 name,
